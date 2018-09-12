@@ -16,3 +16,7 @@ bin
 *.iml
 .idea
 
+# Project
+
+data
+
