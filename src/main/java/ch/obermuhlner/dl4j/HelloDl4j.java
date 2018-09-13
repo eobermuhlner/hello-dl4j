@@ -22,6 +22,7 @@ import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.activations.Activation;
+import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.dataset.api.preprocessor.DataNormalization;
@@ -63,15 +64,13 @@ public class HelloDl4j {
     public double testFraction = 0.2;
     public List<String> labels = new ArrayList<>();
 
-    public void test() {
-
-    }
-
     public void create() throws IOException {
         init();
         int numLabels = labels.size();
 
         MultiLayerNetwork network = alexnetModel(numLabels, channels);
+        network.init();
+        System.out.println(network.summary());
         ModelSerializer.writeModel(network, getModelFile(), true);
     }
 
@@ -134,34 +133,32 @@ public class HelloDl4j {
         ModelSerializer.writeModel(network, modelFile, true);
     }
 
-    public void run(List<String> files) throws IOException {
+    public void test() {
+
+    }
+
+    public void run(List<String> filenames) throws IOException {
         init();
-        int numLabels = labels.size();
 
         File modelFile = getModelFile();
         MultiLayerNetwork network = ModelSerializer.restoreMultiLayerNetwork(modelFile);
 
-        DataNormalization scaler = new ImagePreProcessingScaler(0, 1);
-        ImageRecordReader recordReader = new ImageRecordReader(height, width, channels);
+        NativeImageLoader imageLoader = new NativeImageLoader(height, width, channels);
+        ImagePreProcessingScaler scaler = new ImagePreProcessingScaler(0, 1);
 
-        ImageTransform transform = new ResizeImageTransform(width, height);
+        for (String filename : filenames) {
+            System.out.println("FILE: " + filename);
+            File file = new File(filename);
+            INDArray matrix = imageLoader.asMatrix(file);
+            scaler.transform(matrix);
 
-        CollectionInputSplit runData = new CollectionInputSplit(toURI(files));
-        System.out.println("Data: " + runData.length());
-
-        recordReader.initialize(runData);
-        DataSetIterator dataIter = new RecordReaderDataSetIterator(recordReader, batchSize, 1, numLabels);
-        scaler.fit(dataIter);
-        dataIter.setPreProcessor(scaler);
-
-        //Evaluation evaluation = network.evaluate(dataIter);
-
-        while (dataIter.hasNext()) {
-            DataSet dataSet = dataIter.next();
-            int[] prediction = network.predict(dataSet.getFeatures());
-            System.out.println("PREDICTION " + Arrays.toString(prediction));
+            INDArray output = network.output(matrix);
+            System.out.println("OUTPUT " + output);
+            for (int i = 0; i<labels.size(); i++) {
+                String label = labels.get(i);
+                System.out.println("LABEL " + label + " : " + output.getDouble(0, i));
+            }
         }
-
     }
 
     private void init() {
